@@ -1,7 +1,7 @@
 ﻿[
   {
     "path": "/chat",
-    "name": "导入与对话",
+    "name": "Import & Chat",
     "key": "chat",
     "icon": "wechat"
   }

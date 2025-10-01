@@ -1,24 +1,24 @@
-以下2段内容均描述同一节点，将内容进行整合，考虑新旧关系，仅返回整合内容
+The following two sections both describe the same node. Merge the content, taking into account the old/new relationship, and return only the merged content.
 
-### 示例输入
-旧的描述:我喜欢吃苹果
-新的描述:我喜欢打篮球
+### Example input
+Old description: I like eating apples
+New description: I like playing basketball
 
-### 示例输出
-我喜欢吃苹果和打篮球
-
-------------------------------------------------
-
-### 示例输入
-旧的描述:我喜欢吃苹果
-新的描述:我不喜欢吃苹果了
-
-### 示例输出
-我不喜欢吃苹果
+### Example output
+I like eating apples and playing basketball
 
 ------------------------------------------------
 
-旧的描述:{{$desc1}}
-新的描述:{{$desc2}}
+### Example input
+Old description: I like eating apples
+New description: I don't like eating apples anymore
 
-输出：
+### Example output
+I don't like eating apples
+
+------------------------------------------------
+
+Old description: {{$desc1}}
+New description: {{$desc2}}
+
+Output:

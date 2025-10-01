@@ -1,13 +1,6 @@
 using AntDesign.ProLayout;
-using GraphRag.Net;
 using GraphRag.Net.Options;
-using GraphRag.Net.Web.Mock;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Options;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Embeddings;
-using Microsoft.SemanticKernel.TextGeneration;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,7 +20,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c => {
     c.SwaggerDoc("v1", new() { Title = "GraphRag.Net.Api", Version = "v1" });
-    //添加Api层注释（true表示显示控制器注释）
+    //Add API layer comments (true indicates showing controller comments)
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath, true);
@@ -38,10 +31,10 @@ builder.Configuration.GetSection("TextChunker").Get<TextChunkerOption>();
 builder.Configuration.GetSection("GraphSearch").Get<GraphSearchOption>();
 //builder.Configuration.GetSection("GraphDBConnection").Get<GraphDBConnectionOption>();
 
-//这里可以自定义Kernel,如果不传则使用默认Kernel
+//You can customize Kernel here, if not passed, the default Kernel will be used
 builder.Services.AddGraphRagNet();
 
-////自定义Kernel 可以实现其他模型的对接实现
+////Custom Kernel can implement integration with other models
 //var kernelBuild = Kernel.CreateBuilder();
 //kernelBuild.Services.AddKeyedSingleton<ITextGenerationService>("mock-text", new MockTextCompletion());
 //kernelBuild.Services.AddKeyedSingleton<IChatCompletionService>("mock-chat", new MockChatCompletion());
@@ -66,15 +59,14 @@ else
     app.UseHsts();
 }
 
+app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
-app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
-
 app.UseAuthorization();
 
+app.MapRazorPages();
 app.MapControllers();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
 
 app.Run();

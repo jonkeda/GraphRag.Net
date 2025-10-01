@@ -11,7 +11,7 @@
 <Modal Title="@nodeTitle" Visible="@isModalVisible" OnOk="HandleOk" OnCancel="HandleCancel">
     @nodeDescription
 </Modal>
-<!-- 引入relation-graph -->
+<!-- Include relation-graph -->
 <script src="./js/vue2.js"></script>
 <script src="./js/screenfull.min.js"></script>
 <script src="./js/html2canvas.min.js"></script>
@@ -19,7 +19,7 @@
 
 <script>
     // window.onload = function () {
-    //      // 等待 Blazor 初始化完成
+    //      // Wait for Blazor initialization to complete
     //    Blazor.start().then(function () {
     //       initializeVueApp(dotNetHelper);
     //    });
@@ -31,7 +31,7 @@
                 message: 'Hello Vue!',
                 graphOptions: {
                     defaultJunctionPoint: 'border'
-                    // 这里可以参考"Graph 图谱"中的参数进行设置
+                    // You can refer to the parameters in "Graph Map" for configuration
                 }
             },
             mounted() {
@@ -44,31 +44,31 @@
                     console.log('ref:', this.$refs.seeksRelationGraph);
                     const url = new URL(window.location.href);
 
-                    // 获取查询字符串部分
+                    // Get the query string part
                     const queryString = url.search;
 
-                    // 解析查询字符串为一个 URLSearchParams 对象
+                    // Parse the query string into a URLSearchParams object
                     const urlParams = new URLSearchParams(queryString);
 
-                    // 获取参数的值，例如 'index'
+                    // Get the parameter value, e.g. 'index'
                     const index = urlParams.get('index');
                     fetch('/api/Graph/GetAllGraphs?index=' + index)
                         .then(response => {
                             if (!response.ok) {
-                                throw new Error('网络响应不成功，状态码：' + response.status);
+                                throw new Error('Network response was not successful, status code: ' + response.status);
                             }
-                            return response.json(); // 或者 response.json() 取决于你的响应内容类型
+                            return response.json(); // or response.json() depending on your response content type
                         })
                         .then(data => {
-                            // 请求成功，处理响应数据
+                            // Request successful, handle response data
                             console.log(data);
                             this.$refs.seeksRelationGraph.setJsonData(data, (seeksRGGraph) => {
-                                // 这些写上当图谱初始化完成后需要执行的代码
+                                // Write code here that needs to be executed after the graph initialization is complete
                             });
                         })
                         .catch(error => {
-                            // 处理错误
-                            console.error('请求出错：', error);
+                            // Handle errors
+                            console.error('Request error:', error);
                         });
                 },
                 onNodeClick(nodeObject, $event) {
@@ -113,8 +113,8 @@
     {
         if (firstRender)
         {
-            // 确保所有脚本加载完成后，调用初始化 Vue 的 JavaScript 函数
-            await Task.Delay(500); // 短暂延时
+            // Ensure all scripts are loaded before calling the JavaScript function to initialize Vue
+            await Task.Delay(500); // Short delay
             objRef = DotNetObjectReference.Create(this);
             try
             {

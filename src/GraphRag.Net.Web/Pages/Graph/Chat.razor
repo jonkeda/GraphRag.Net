@@ -1,6 +1,5 @@
 ﻿@namespace GraphRag.Net.Web.Pages.Graph
 @page "/Chat"
-@using GraphRag.Net.Domain.Interface
 
 <style>
     .chat-page {
@@ -129,8 +128,8 @@
 
 <div class="chat-page">
     <div class="page-header">
-        <p class="page-title">🔍 GraphRAG 智能问答系统</p>
-        <p class="page-subtitle">基于知识图谱的智能搜索与文档导入平台</p>
+        <p class="page-title">🔍 GraphRAG Intelligent Q&amp;A System</p>
+        <p class="page-subtitle">Knowledge Graph-based Intelligent Search and Document Import Platform</p>
     </div>
     
     <Row Gutter="(24, 24)">
@@ -138,13 +137,13 @@
             <Card Class="section-card" 
                   Style="height: 100%;">
                 <TitleTemplate>
-                    <span class="card-title">🔍 搜索图谱内容</span>
+                    <span class="card-title">🔍 Search Graph Content</span>
                 </TitleTemplate>
                 <ChildContent>
-                <Spin Spinning=@loadding>
+                <Spin Spinning=@loading>
                     <div class="form-group">
                         <label class="form-label">
-                            <Icon Type="database" /> 选择索引
+                            <Icon Type="database" /> Select Index
                         </label>
                         <Select TItem="string"
                                 TItemValue="string"
@@ -152,8 +151,8 @@
                                 LabelProperty="c=>c"
                                 DataSource="@_indexList"
                                 @bind-Value="@_index"
-                                Placeholder="请选择要搜索的索引"
-                                Size="@AntSizeLDSType.Large"
+                                Placeholder="Please select an index to search"
+                                Size="@InputSize.Large"
                                 Style="width: 100%;"
                                 OnSelectedItemChanged="OnSelectedItemChangedHandler">
                         </Select>
@@ -161,23 +160,23 @@
                     
                     <div class="form-group">
                         <label class="form-label">
-                            <Icon Type="message" /> 提出问题
+                            <Icon Type="message" /> Ask Question
                         </label>
                         <Input @bind-Value="_input" 
-                               Placeholder="请输入您想要了解的问题..." 
-                               Size="@AntSizeLDSType.Large"
+                               Placeholder="Please enter your question..." 
+                               Size="@InputSize.Large"
                                AllowClear />
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">
-                            <Icon Type="bulb" /> 智能回答
+                            <Icon Type="bulb" /> AI Answer
                         </label>
                         <div class="result-area">
                             <TextArea @bind-Value="_output" 
                                       MinRows="8" 
                                       MaxRows="12" 
-                                      Placeholder="AI 回答将在这里显示..." 
+                                      Placeholder="AI answer will be displayed here..." 
                                       Style="background: transparent; border: none; resize: none;" />
                         </div>
                     </div>
@@ -185,17 +184,17 @@
                     <div class="action-buttons">
                         <Button Type="@ButtonType.Primary" 
                                 OnClick="Search" 
-                                Size="@AntSizeLDSType.Large"
+                                Size="@ButtonSize.Large"
                                 Class="primary-button"
                                 Style="flex: 1;">
-                            <Icon Type="search" /> 节点搜索
+                            <Icon Type="search" /> Node Search
                         </Button>
                         <Button Type="@ButtonType.Primary" 
                                 OnClick="Search1" 
-                                Size="@AntSizeLDSType.Large"
+                                Size="@ButtonSize.Large"
                                 Class="primary-button"
                                 Style="flex: 1;">
-                            <Icon Type="cluster" /> 社区搜索
+                            <Icon Type="cluster" /> Community Search
                         </Button>
                     </div>
                     
@@ -203,10 +202,10 @@
                     
                     <a href="/graph?index=@_index" target="_blank" style="text-decoration: none;">
                         <Button Type="@ButtonType.Default" 
-                                Size="@AntSizeLDSType.Large"
+                                Size="@ButtonSize.Large"
                                 Class="secondary-button"
                                 Block>
-                            <Icon Type="eye" /> 查看完整知识图谱
+                            <Icon Type="eye" /> View Complete Knowledge Graph
                         </Button>
                     </a>
                 </Spin>
@@ -218,36 +217,36 @@
             <Card Class="section-card" 
                   Style="height: 100%;">
                 <TitleTemplate>
-                    <span class="card-title">📝 导入文本数据</span>
+                    <span class="card-title">📝 Import Text Data</span>
                 </TitleTemplate>
                 <ChildContent>
                 <div class="form-group">
                     <label class="form-label">
-                        <Icon Type="tag" /> 索引名称
+                        <Icon Type="tag" /> Index Name
                     </label>
                     <Input @bind-Value="_importIndex" 
-                           Placeholder="为您的数据设置一个便于识别的索引名称..." 
-                           Size="@AntSizeLDSType.Large"
+                           Placeholder="Set a recognizable index name for your data..." 
+                           Size="@InputSize.Large"
                            AllowClear />
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">
-                        <Icon Type="file-text" /> 文本内容
+                        <Icon Type="file-text" /> Text Content
                     </label>
                     <TextArea @bind-Value="_importText" 
                               MinRows="12" 
                               MaxRows="16" 
-                              Placeholder="在此输入要导入的文本内容，支持长文本和多段落..." 
+                              Placeholder="Enter the text content to import here, supports long text and multiple paragraphs..." 
                               Style="width: 100%; border-radius: 8px;" />
                 </div>
                 
                 <Button Type="@ButtonType.Primary" 
                         OnClick="InputText" 
-                        Size="@AntSizeLDSType.Large"
+                        Size="@ButtonSize.Large"
                         Class="primary-button"
                         Block>
-                    <Icon Type="import" /> 立即导入文本数据
+                    <Icon Type="import" /> Import Text Data Now
                 </Button>
                 </ChildContent>
             </Card>
@@ -257,16 +256,16 @@
             <Card Class="section-card" 
                   Style="height: 100%;">
                 <TitleTemplate>
-                    <span class="card-title">📁 导入 TXT 文件</span>
+                    <span class="card-title">📁 Import TXT File</span>
                 </TitleTemplate>
                 <ChildContent>
                 <div class="form-group">
                     <label class="form-label">
-                        <Icon Type="tag" /> 索引名称
+                        <Icon Type="tag" /> Index Name
                     </label>
                     <Input @bind-Value="_importIndex" 
-                           Placeholder="为您的文件设置一个便于识别的索引名称..." 
-                           Size="@AntSizeLDSType.Large"
+                           Placeholder="Set a recognizable index name for your file..." 
+                           Size="@InputSize.Large"
                            AllowClear />
                 </div>
                 
@@ -283,10 +282,10 @@
                                 <Icon Type="cloud-upload" Style="font-size: 48px; color: #40a9ff;" />
                             </p>
                             <p style="font-size: 18px; font-weight: 500; margin-bottom: 8px; color: #262626;">
-                                点击选择文件或拖拽到此处
+                                Click to select files or drag and drop here
                             </p>
                             <p style="color: #8c8c8c; margin: 0; font-size: 14px;">
-                                支持 .txt 格式文件，可单个或批量上传
+                                Supports .txt format files, single or batch upload
                             </p>
                         </Upload>
                     </div>
@@ -294,10 +293,10 @@
                 
                 <div class="external-link">
                     <a href="https://antsk.cn" target="_blank" style="color: #1890ff; text-decoration: none; display: block; margin-bottom: 8px;">
-                        <Icon Type="link" /> 了解更多文件导入类型 - AntSK 项目
+                        <Icon Type="link" /> Learn more file import types - AntSK Project
                     </a>
                     <a href="https://fileext.antsk.cn" target="_blank" style="color: #52c41a; text-decoration: none;">
-                        <Icon Type="file-text" /> 强大的文档解析API - 支持多格式转换
+                        <Icon Type="file-text" /> Powerful Document Parsing API - Supports Multi-format Conversion
                     </a>
                 </div>
                 </ChildContent>

@@ -6,65 +6,65 @@
     <members>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.GetAllIndex">
             <summary>
-            获取所有的索引数据
+            Get all index keys
             </summary>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.GetAllGraphs(System.String)">
             <summary>
-            获取所有的图谱数据
+            Get all graph data
             </summary>
-            <param name="index"></param>
+            <param name="index">Index key</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.InsertGraphData(GraphRag.Net.Api.Controllers.InputModel)">
             <summary>
-            插入文本数据
+            Insert raw text (will trigger graph generation)
             </summary>
-            <param name="model"></param>
+            <param name="model">Input model</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.SearchGraph(GraphRag.Net.Api.Controllers.InputModel)">
             <summary>
-            搜索递归获取节点相关的所有边和节点进行图谱对话
+            Search recursively for related nodes/edges and perform graph based QA
             </summary>
-            <param name="model"></param>
+            <param name="model">Input model</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.SearchGraphCommunity(GraphRag.Net.Api.Controllers.InputModel)">
             <summary>
-            通过社区算法检索社区节点进行对话
+            Search via community algorithm for dialogue
             </summary>
-            <param name="model"></param>
+            <param name="model">Input model</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.ImportTxt(System.String,Microsoft.AspNetCore.Http.IFormFile)">
             <summary>
-            导入txt文档
+            Import txt document
             </summary>
-            <param name="index"></param>
-            <param name="file"></param>
+            <param name="index">Index key</param>
+            <param name="file">Uploaded file</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.GraphCommunities(System.String)">
             <summary>
-            通过社区检测生成社区和摘要
+            Generate communities and summaries via community detection
             </summary>
-            <param name="index"></param>
+            <param name="index">Index key</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.GraphGlobal(System.String)">
             <summary>
-            通过社区摘要生成全局摘要
+            Generate global summary from community summaries
             </summary>
-            <param name="index"></param>
+            <param name="index">Index key</param>
             <returns></returns>
         </member>
         <member name="M:GraphRag.Net.Api.Controllers.GraphController.DeleteGraph(System.String)">
             <summary>
-            删除图谱数据
+            Delete all graph data of an index
             </summary>
-            <param name="index"></param>
+            <param name="index">Index key</param>
             <returns></returns>
         </member>
     </members>
