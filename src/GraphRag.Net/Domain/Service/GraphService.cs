@@ -1,4 +1,5 @@
-﻿using GraphRag.Net.Domain.Interface;
+﻿using GraphRag.Net.Base;
+using GraphRag.Net.Domain.Interface;
 using GraphRag.Net.Domain.Model.Graph;
 using GraphRag.Net.Options;
 using GraphRag.Net.Repositories;
@@ -14,8 +15,7 @@ namespace GraphRag.Net.Domain.Service
 {
     [ServiceDescription(typeof(IGraphService), ServiceLifetime.Scoped)]
     public class GraphService(
-        INodes_Repositories _nodes_Repositories,
-        IEdges_Repositories _edges_Repositories,
+        IGraphRepository _graphRepository,
         ISemanticService _semanticService,
         ICommunities_Repositories _communities_Repositories,
         ICommunitieNodes_Repositories _communitieNodes_Repositories,
@@ -29,8 +29,22 @@ namespace GraphRag.Net.Domain.Service
         /// <returns></returns>
         public List<string> GetAllIndex()
         {
-            var indexs = _nodes_Repositories.GetDB().Queryable<Nodes>().GroupBy(p => p.Index).Select(p => p.Index).ToList();
-            return indexs;
+            // TODO: For now we'll use SqlSugar fallback if available, or return empty list
+            // This method needs to be refactored to work with IGraphRepository
+            try
+            {
+                if (_graphRepository is SqlSugarGraphRepository sqlSugarRepo)
+                {
+                    return sqlSugarRepo._nodesRepository.GetDB().Queryable<Nodes>().GroupBy(p => p.Index).Select(p => p.Index).ToList();
+                }
+                // For Neo4j and other backends, we need a different approach
+                // This could be implemented as a method in IGraphRepository
+                return new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>
@@ -44,8 +58,7 @@ namespace GraphRag.Net.Domain.Service
                 throw new ArgumentException("Index required value cannot be null.");
             }
             GraphViewModel graphViewModel = new GraphViewModel();
-            var nodes = _nodes_Repositories.GetList(p => p.Index == index);
-            var edges = _edges_Repositories.GetList(p => p.Index == index);
+            var (nodes, edges) = _graphRepository.GetGraphAsync(index).Result;
             Dictionary<string, string> TypeColor = new Dictionary<string, string>();
             Random random = new Random();
             foreach (var n in nodes)
