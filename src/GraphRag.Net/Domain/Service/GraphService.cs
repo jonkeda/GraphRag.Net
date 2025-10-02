@@ -1,4 +1,5 @@
-﻿using GraphRag.Net.Domain.Interface;
+﻿using GraphRag.Net.Base;
+using GraphRag.Net.Domain.Interface;
 using GraphRag.Net.Domain.Model.Graph;
 using GraphRag.Net.Options;
 using GraphRag.Net.Repositories;
@@ -14,8 +15,7 @@ namespace GraphRag.Net.Domain.Service
 {
     [ServiceDescription(typeof(IGraphService), ServiceLifetime.Scoped)]
     public class GraphService(
-        INodes_Repositories _nodes_Repositories,
-        IEdges_Repositories _edges_Repositories,
+        IGraphRepository _graphRepository,
         ISemanticService _semanticService,
         ICommunities_Repositories _communities_Repositories,
         ICommunitieNodes_Repositories _communitieNodes_Repositories,
@@ -29,8 +29,14 @@ namespace GraphRag.Net.Domain.Service
         /// <returns></returns>
         public List<string> GetAllIndex()
         {
-            var indexs = _nodes_Repositories.GetDB().Queryable<Nodes>().GroupBy(p => p.Index).Select(p => p.Index).ToList();
-            return indexs;
+            try
+            {
+                return _graphRepository.GetAllIndicesAsync().Result;
+            }
+            catch
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>
@@ -44,8 +50,7 @@ namespace GraphRag.Net.Domain.Service
                 throw new ArgumentException("Index required value cannot be null.");
             }
             GraphViewModel graphViewModel = new GraphViewModel();
-            var nodes = _nodes_Repositories.GetList(p => p.Index == index);
-            var edges = _edges_Repositories.GetList(p => p.Index == index);
+            var (nodes, edges) = _graphRepository.GetGraphAsync(index).Result;
             Dictionary<string, string> TypeColor = new Dictionary<string, string>();
             Random random = new Random();
             foreach (var n in nodes)
@@ -187,7 +192,8 @@ namespace GraphRag.Net.Domain.Service
                     bool isContinue = false;
 
                     //判断是否存在相同节点
-                    var oldNode = _nodes_Repositories.GetFirst(p => p.Index == index && p.Name == n.Name);
+                    var existingNodes = await _graphRepository.GetNodesAsync(index);
+                    var oldNode = existingNodes.FirstOrDefault(p => p.Name == n.Name);
                     if (oldNode.IsNotNull() && !string.IsNullOrWhiteSpace(n.Desc))
                     {
                         //相同节点关联edge关系
@@ -202,7 +208,7 @@ namespace GraphRag.Net.Domain.Service
                             oldNode.Desc = newDesc;
                         }
                         //更新描述
-                        _nodes_Repositories.Update(oldNode);
+                        await _graphRepository.UpdateNodeAsync(oldNode);
                         text2 = $"Name:{oldNode.Name};Type:{oldNode.Type};Desc:{oldNode.Desc}";
                         nodeDic.Add(n.Id, oldNode.Id);
                         await textMemory.SaveInformationAsync(index, id: oldNode.Id, text: text2, cancellationToken: default);
@@ -251,13 +257,13 @@ namespace GraphRag.Net.Domain.Service
                     {
                         nodeDic.Add(n.Id, node.Id);
                     }
-                    _nodes_Repositories.Insert(node);
+                    await _graphRepository.InsertNodeAsync(node);
                     newNodes.Add(node);
 
                     // 检查与潜在相关节点的关系
                     foreach (var relatedNodeId in potentialRelatedNodes)
                     {
-                        var node1 = _nodes_Repositories.GetFirst(p => p.Id == relatedNodeId);
+                        var node1 = await _graphRepository.GetNodeByIdAsync(relatedNodeId);
                         if (node1 != null)
                         {
                             string text1 = $"Name:{node1.Name};Type:{node1.Type};Desc:{node1.Desc}";
@@ -274,11 +280,11 @@ namespace GraphRag.Net.Domain.Service
                                     relationShip.Edge.Source = Id;
                                     relationShip.Edge.Target = node1.Id;
                                 }
-                                if (!_edges_Repositories.IsAny(p => p.Target == relationShip.Edge.Target && p.Source == relationShip.Edge.Source))
+                                if (!await _graphRepository.EdgeExistsAsync(relationShip.Edge.Source, relationShip.Edge.Target, index))
                                 {
                                     relationShip.Edge.Id = Guid.NewGuid().ToString();
                                     relationShip.Edge.Index = index;
-                                    _edges_Repositories.Insert(relationShip.Edge);
+                                    await _graphRepository.InsertEdgeAsync(relationShip.Edge);
                                 }
                             }
                         }
@@ -298,35 +304,43 @@ namespace GraphRag.Net.Domain.Service
                         Target = nodeDic[e.Target],
                         Relationship = e.Relationship
                     };
-                    _edges_Repositories.Insert(edge);
+                    await _graphRepository.InsertEdgeAsync(edge);
                 }
 
                 // 检测和处理孤立节点
                 await ProcessOrphanNodesAsync(index, newNodes, textMemory);
 
-                //查询Edges 的Source和Target 重复数据
-                var repeatEdges = _edges_Repositories.GetDB().Queryable<Edges>()
-                .GroupBy(p => new { p.Source, p.Target })
-                .Select(p => new { p.Source, p.Target, Count = SqlFunc.AggregateCount(p.Source) })
-                .ToList().Where(p => p.Count > 1).ToList();
-                //合并查询Edges 的Source和Target 重复数据
-                foreach (var edge in repeatEdges)
+                // Edge deduplication is now handled by the repository implementations
+                // Neo4j uses deterministic IDs and semantic merging
+                // SqlSugar can use the existing deduplication logic if needed
+                if (_graphRepository is SqlSugarGraphRepository sqlRepo)
                 {
-                    var edges = _edges_Repositories.GetList(p => p.Source == edge.Source && p.Target == edge.Target);
-                    var firstEdge = edges.First();
-
-                    for (int i = 1; i < edges.Count(); i++)
+                    // Keep existing deduplication logic for SqlSugar
+                    var repeatEdges = sqlRepo._edgesRepository.GetDB().Queryable<Edges>()
+                    .GroupBy(p => new { p.Source, p.Target })
+                    .Select(p => new { p.Source, p.Target, Count = SqlFunc.AggregateCount(p.Source) })
+                    .ToList().Where(p => p.Count > 1).ToList();
+                    
+                    foreach (var edge in repeatEdges)
                     {
-                        if (firstEdge.Relationship == edges[i].Relationship)
+                        var edges = await sqlRepo.GetEdgesBySourceAsync(index, edge.Source);
+                        edges = edges.Where(e => e.Target == edge.Target).ToList();
+                        if (edges.Count > 1)
                         {
-                            //相同的边进行合并
-                            _edges_Repositories.Delete(edges[i]);
-                            continue;
+                            var firstEdge = edges.First();
+                            for (int i = 1; i < edges.Count; i++)
+                            {
+                                if (firstEdge.Relationship == edges[i].Relationship)
+                                {
+                                    await sqlRepo.DeleteEdgeAsync(edges[i].Id);
+                                    continue;
+                                }
+                                var newDesc = await _semanticService.MergeDesc(firstEdge.Relationship, edges[i].Relationship);
+                                firstEdge.Relationship = newDesc;
+                                await sqlRepo.UpdateEdgeAsync(firstEdge);
+                                await sqlRepo.DeleteEdgeAsync(edges[i].Id);
+                            }
                         }
-                        var newDesc = await _semanticService.MergeDesc(firstEdge.Relationship, edges[i].Relationship);
-                        firstEdge.Relationship = newDesc;
-                        _edges_Repositories.Update(firstEdge);
-                        _edges_Repositories.Delete(edges[i]);
                     }
                 }
             }
@@ -354,13 +368,14 @@ namespace GraphRag.Net.Domain.Service
 
             if (textMemModelList.Any())
             {
-                var nodes = _nodes_Repositories.GetList(p => p.Index == index && textMemModelList.Select(c => c.Id).Contains(p.Id));
+                var nodeIds = textMemModelList.Select(c => c.Id).ToList();
+                var nodes = await _graphRepository.GetNodesByIdsAsync(index, nodeIds);
                 // 创建节点权重字典
                 Dictionary<string, double> nodeWeights = textMemModelList.ToDictionary(
                     t => t.Id,
                     t => t.Relevance
                 );
-                var graphModel = GetGraphAllRecursion(index, nodes, nodeWeights);
+                var graphModel = await GetGraphAllRecursion(index, nodes, nodeWeights);
 
                 // 计算预估的token数量，并在必要时限制节点数量
                 int estimatedTokens = EstimateTokenCount(graphModel);
@@ -490,8 +505,9 @@ namespace GraphRag.Net.Domain.Service
 
             if (textMemModelList.Any())
             {
-                var nodes = _nodes_Repositories.GetList(p => p.Index == index && textMemModelList.Select(c => c.Id).Contains(p.Id));
-                var graphModel = GetGraphAllCommunitiesRecursion(index, nodes);
+                var nodeIds = textMemModelList.Select(c => c.Id).ToList();
+                var nodes = await _graphRepository.GetNodesByIdsAsync(index, nodeIds);
+                var graphModel = await GetGraphAllCommunitiesRecursion(index, nodes);
 
                 // 计算预估的token数量，并在必要时限制节点数量
                 int estimatedTokens = EstimateTokenCount(graphModel);
@@ -618,8 +634,7 @@ namespace GraphRag.Net.Domain.Service
         /// <returns></returns>
         public async Task GraphCommunitiesAsync(string index)
         {
-            var nodes = _nodes_Repositories.GetList(p => p.Index == index);
-            var edges = _edges_Repositories.GetList(p => p.Index == index);
+            var (nodes, edges) = await _graphRepository.GetGraphAsync(index);
 
             //删除社区数据
             _communitieNodes_Repositories.Delete(p => p.Index == index);
@@ -706,14 +721,13 @@ namespace GraphRag.Net.Domain.Service
             SemanticTextMemory textMemory = await _semanticService.GetTextMemory();
 
             // 获取所有孤立或连接较少的节点
-            var allNodes = _nodes_Repositories.GetList(p => p.Index == index);
+            var allNodes = await _graphRepository.GetNodesAsync(index);
             var lowConnectedNodes = new List<Nodes>();
 
             foreach (var node in allNodes)
             {
-                var connectionCount = _edges_Repositories.GetDB().Queryable<Edges>()
-                    .Where(e => (e.Source == node.Id || e.Target == node.Id) && e.Index == index)
-                    .Count();
+                var connectedEdges = await _graphRepository.GetEdgesByNodeAsync(index, node.Id);
+                var connectionCount = connectedEdges.Count;
 
                 // 如果连接数少于2个，认为是需要增强的节点
                 if (connectionCount < 2)
@@ -759,7 +773,7 @@ namespace GraphRag.Net.Domain.Service
 
             Console.WriteLine("开始验证和优化现有关系...");
 
-            var allEdges = _edges_Repositories.GetList(p => p.Index == index);
+            var allEdges = await _graphRepository.GetEdgesAsync(index);
             var weakRelationships = new List<Edges>();
 
             // 识别可能需要优化的关系
@@ -783,8 +797,8 @@ namespace GraphRag.Net.Domain.Service
             {
                 try
                 {
-                    var sourceNode = _nodes_Repositories.GetFirst(p => p.Id == edge.Source);
-                    var targetNode = _nodes_Repositories.GetFirst(p => p.Id == edge.Target);
+                    var sourceNode = await _graphRepository.GetNodeByIdAsync(edge.Source);
+                    var targetNode = await _graphRepository.GetNodeByIdAsync(edge.Target);
 
                     if (sourceNode != null && targetNode != null)
                     {
@@ -797,7 +811,7 @@ namespace GraphRag.Net.Domain.Service
                             newRelationship.Edge.Relationship != edge.Relationship)
                         {
                             edge.Relationship = newRelationship.Edge.Relationship;
-                            _edges_Repositories.Update(edge);
+                            await _graphRepository.UpdateEdgeAsync(edge);
                             optimizedCount++;
                             Console.WriteLine($"优化关系: {sourceNode.Name} -> {targetNode.Name}: {newRelationship.Edge.Relationship}");
                         }
@@ -815,15 +829,22 @@ namespace GraphRag.Net.Domain.Service
         public async Task DeleteGraph(string index)
         {
             SemanticTextMemory textMemory = await _semanticService.GetTextMemory();
-            var nodes = await _nodes_Repositories.GetListAsync(p => p.Index == index);
+            var nodes = await _graphRepository.GetNodesAsync(index);
             foreach (var node in nodes)
             {
                 //删除向量数据
                 await textMemory.RemoveAsync(index, node.Id);
             }
-            //删除索引数据
-            await _nodes_Repositories.DeleteAsync(p => p.Index == index);
-            await _edges_Repositories.DeleteAsync(p => p.Index == index);
+            //删除索引数据 - 删除所有节点和边
+            foreach (var node in nodes)
+            {
+                await _graphRepository.DeleteNodeAsync(node.Id);
+            }
+            var edges = await _graphRepository.GetEdgesAsync(index);
+            foreach (var edge in edges)
+            {
+                await _graphRepository.DeleteEdgeAsync(edge.Id);
+            }
             await _communities_Repositories.DeleteAsync(p => p.Index == index);
             await _communitieNodes_Repositories.DeleteAsync(p => p.Index == index);
             await _globals_Repositories.DeleteAsync(p => p.Index == index);
@@ -846,8 +867,8 @@ namespace GraphRag.Net.Domain.Service
             foreach (var node in newNodes)
             {
                 // 检查节点是否为孤立节点（没有任何边连接）
-                bool hasConnections = _edges_Repositories.IsAny(p =>
-                    (p.Source == node.Id || p.Target == node.Id) && p.Index == index);
+                var nodeEdges = await _graphRepository.GetEdgesByNodeAsync(index, node.Id);
+                bool hasConnections = nodeEdges.Any();
 
                 if (!hasConnections)
                 {
@@ -896,8 +917,9 @@ namespace GraphRag.Net.Domain.Service
             // 第三轮：基于节点类型搜索相同类型的实体
             if (candidateNodes.Count < 2)
             {
-                var sameTypeNodes = _nodes_Repositories.GetList(p =>
-                    p.Index == index && p.Type == orphanNode.Type && p.Id != orphanNode.Id)
+                var allNodes = await _graphRepository.GetNodesAsync(index);
+                var sameTypeNodes = allNodes
+                    .Where(p => p.Type == orphanNode.Type && p.Id != orphanNode.Id)
                     .Take(5).Select(p => p.Id).ToList();
 
                 foreach (var nodeId in sameTypeNodes)
@@ -913,7 +935,7 @@ namespace GraphRag.Net.Domain.Service
             int connectionsFound = 0;
             foreach (var candidateId in candidateNodes.Take(5)) // 限制检查数量以控制成本
             {
-                var candidateNode = _nodes_Repositories.GetFirst(p => p.Id == candidateId);
+                var candidateNode = await _graphRepository.GetNodeByIdAsync(candidateId);
                 if (candidateNode != null)
                 {
                     string candidateText = $"Name:{candidateNode.Name};Type:{candidateNode.Type};Desc:{candidateNode.Desc}";
@@ -937,7 +959,7 @@ namespace GraphRag.Net.Domain.Service
                             }
 
                             // 检查关系是否已存在
-                            if (!_edges_Repositories.IsAny(p => p.Source == sourceId && p.Target == targetId && p.Index == index))
+                            if (!await _graphRepository.EdgeExistsAsync(sourceId, targetId, index))
                             {
                                 var edge = new Edges()
                                 {
@@ -947,7 +969,7 @@ namespace GraphRag.Net.Domain.Service
                                     Target = targetId,
                                     Relationship = relationShip.Edge.Relationship
                                 };
-                                _edges_Repositories.Insert(edge);
+                                await _graphRepository.InsertEdgeAsync(edge);
                                 connectionsFound++;
                                 Console.WriteLine($"为孤立节点 {orphanNode.Name} 建立关系：{relationShip.Edge.Relationship} -> {candidateNode.Name}");
 
@@ -1039,7 +1061,7 @@ namespace GraphRag.Net.Domain.Service
         /// <param name="initialNodes">初始节点列表</param>
         /// <param name="nodeWeights">节点权重字典</param>
         /// <returns></returns>
-        private GraphModel GetGraphAllRecursion(string index, List<Nodes> initialNodes, Dictionary<string, double> nodeWeights)
+        private async Task<GraphModel> GetGraphAllRecursion(string index, List<Nodes> initialNodes, Dictionary<string, double> nodeWeights)
         {
             var allNodes = new List<Nodes>(initialNodes);
             var allEdges = new List<Edges>();
@@ -1061,7 +1083,7 @@ namespace GraphRag.Net.Domain.Service
                 var currentNodes = nodesToExplore.Take(Math.Min(5, nodesToExplore.Count)).ToList();
                 nodesToExplore.RemoveRange(0, currentNodes.Count);
 
-                var newEdges = GetEdges(index, currentNodes);
+                var newEdges = await GetEdges(index, currentNodes);
                 if (!newEdges.Any())
                 {
                     continue;
@@ -1086,7 +1108,7 @@ namespace GraphRag.Net.Domain.Service
                 }
 
                 // 获取新节点
-                var newNodes = GetNodes(index, newEdges);
+                var newNodes = await GetNodes(index, newEdges);
                 var nodesToAdd = newNodes.Where(n => !allNodes.Any(existingNode => existingNode.Id == n.Id)).ToList();
                 allNodes.AddRange(nodesToAdd);
                 nodesToExplore.AddRange(nodesToAdd);
@@ -1122,7 +1144,7 @@ namespace GraphRag.Net.Domain.Service
         /// <param name="index"></param>
         /// <param name="initialNodes"></param>
         /// <returns></returns>
-        private GraphModel GetGraphAllCommunitiesRecursion(string index, List<Nodes> initialNodes)
+        private async Task<GraphModel> GetGraphAllCommunitiesRecursion(string index, List<Nodes> initialNodes)
         {
             var allNodes = new List<Nodes>();
             var allEdges = new List<Edges>();
@@ -1134,7 +1156,7 @@ namespace GraphRag.Net.Domain.Service
                 .LeftJoin<Nodes>((c, cn, n) => cn.NodeId == n.Id)
                 .Where((c, cn, n) => nodeIds.Contains(n.Id)).Select((c, cn, n) => new Nodes() { Index = n.Index, Id = n.Id, Name = n.Name, Type = n.Type, Desc = n.Desc }).ToList();
             allNodes.AddRange(communitiesNodes);
-            var newEdges = GetEdges(index, allNodes);
+            var newEdges = await GetEdges(index, allNodes);
 
             foreach (var edge in newEdges)
             {
@@ -1165,11 +1187,11 @@ namespace GraphRag.Net.Domain.Service
         /// <param name="index">索引</param>
         /// <param name="nodes">节点列表</param>
         /// <returns></returns>
-        private List<Edges> GetEdges(string index, List<Nodes> nodes)
+        private async Task<List<Edges>> GetEdges(string index, List<Nodes> nodes)
         {
             var nodeIds = nodes.Select(x => x.Id).ToList();
-            var edges = new List<Edges>();
-            edges = _edges_Repositories.GetList(x => x.Index == index && nodeIds.Contains(x.Source) && nodeIds.Contains(x.Target));
+            var allEdges = await _graphRepository.GetEdgesAsync(index);
+            var edges = allEdges.Where(x => nodeIds.Contains(x.Source) && nodeIds.Contains(x.Target)).ToList();
             return edges;
         }
 
@@ -1179,7 +1201,7 @@ namespace GraphRag.Net.Domain.Service
         /// <param name="index">索引</param>
         /// <param name="edges">边列表</param>
         /// <returns></returns>
-        private List<Nodes> GetNodes(string index, List<Edges> edges)
+        private async Task<List<Nodes>> GetNodes(string index, List<Edges> edges)
         {
             var targets = edges.Select(p => p.Target).ToList();
             var sources = edges.Select(p => p.Source).ToList();
@@ -1187,7 +1209,8 @@ namespace GraphRag.Net.Domain.Service
             nodeIds.AddRange(targets);
             nodeIds.AddRange(sources);
 
-            var nodes = _nodes_Repositories.GetList(p => p.Index == index || nodeIds.Contains(p.Id));
+            var allNodes = await _graphRepository.GetNodesAsync(index);
+            var nodes = allNodes.Where(p => nodeIds.Contains(p.Id)).ToList();
             return nodes;
         }
 

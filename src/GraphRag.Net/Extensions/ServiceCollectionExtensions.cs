@@ -3,6 +3,7 @@ using GraphRag.Net;
 using GraphRag.Net.Options;
 using GraphRag.Net.Repositories;
 using GraphRag.Net.Utils;
+using GraphRag.Net.Base;
 using Microsoft.SemanticKernel;
 using SqlSugar;
 
@@ -51,8 +52,29 @@ namespace Microsoft.Extensions.DependencyInjection
 
             CodeFirst();
             InitSK(services, _kernel);
+            InitGraphRepository(services);
 
             return services;
+        }
+
+        /// <summary>
+        /// 初始化图数据库仓储
+        /// </summary>
+        /// <param name="services"></param>
+        static void InitGraphRepository(IServiceCollection services)
+        {
+            var dbType = GraphDBConnectionOption.DbType;
+            
+            if (string.Equals(dbType, "Neo4j", StringComparison.OrdinalIgnoreCase))
+            {
+                // Register Neo4j repository
+                services.AddScoped<IGraphRepository, Neo4jGraphRepository>();
+            }
+            else
+            {
+                // Default to SqlSugar repository (Sqlite)
+                services.AddScoped<IGraphRepository, SqlSugarGraphRepository>();
+            }
         }
 
         /// <summary>
