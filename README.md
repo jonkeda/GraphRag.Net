@@ -12,6 +12,33 @@
 
 本项目为demo示例，仅用于学习GraphRAG思路。
 
+## 数据库支持
+
+项目现已支持多种后端存储：
+- **SQLite** (默认): 轻量级本地数据库，适合开发和小规模使用
+- **Neo4j**: 专业图数据库，提供高性能图查询和分析能力
+
+### Neo4j 配置
+
+要使用Neo4j作为后端存储，请配置以下选项：
+
+```csharp
+GraphDBConnectionOption.DbType = "Neo4j";
+GraphDBConnectionOption.DBConnection = "bolt://localhost:7687";
+GraphDBConnectionOption.Neo4jUsername = "neo4j";
+GraphDBConnectionOption.Neo4jPassword = "your_password";
+GraphDBConnectionOption.Neo4jDatabase = "neo4j";
+```
+
+**Neo4j 特性:**
+- 自动创建约束和索引
+- 确定性边ID生成 (SHA-256)
+- 关系语义合并
+- 方向标准化和反转标记
+- 批量操作支持 (1000条批次)
+- 指数退避重试机制
+- 事务性操作保证
+
 ## 核心业务流程
 
 ### 1. 整体架构流程

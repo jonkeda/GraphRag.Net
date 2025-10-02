@@ -43,5 +43,8 @@ namespace GraphRag.Net.Base
         Task<bool> TestConnectionAsync();
         Task InitializeAsync();
         Task DisposeAsync();
+        
+        // Utility methods
+        Task<List<string>> GetAllIndicesAsync();
     }
 }

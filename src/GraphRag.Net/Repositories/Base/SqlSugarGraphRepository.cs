@@ -247,5 +247,11 @@ namespace GraphRag.Net.Base
             // SqlSugar disposal is handled by DI container
             await Task.CompletedTask;
         }
+        
+        public async Task<List<string>> GetAllIndicesAsync()
+        {
+            var indexs = _nodesRepository.GetDB().Queryable<Nodes>().GroupBy(p => p.Index).Select(p => p.Index).ToList();
+            return await Task.FromResult(indexs);
+        }
     }
 }

@@ -809,5 +809,32 @@ namespace GraphRag.Net.Base
             _driver?.Dispose();
             _constraintSemaphore?.Dispose();
         }
+        
+        public async Task<List<string>> GetAllIndicesAsync()
+        {
+            await EnsureConstraintsAsync();
+            
+            return await ExecuteWithRetryAsync(async () =>
+            {
+                await using var session = _driver.AsyncSession(o => o.WithDatabase(_database));
+                var result = await session.ExecuteReadAsync(async tx =>
+                {
+                    var cursor = await tx.RunAsync("MATCH (n:Node) RETURN DISTINCT n.index as index");
+                    
+                    var indices = new List<string>();
+                    await foreach (var record in cursor)
+                    {
+                        var index = record["index"].As<string>();
+                        if (!string.IsNullOrEmpty(index))
+                        {
+                            indices.Add(index);
+                        }
+                    }
+                    return indices;
+                });
+                
+                return result;
+            });
+        }
     }
 }
